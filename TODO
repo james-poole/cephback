@@ -1,0 +1,19 @@
+RBD:
+Iterate through all rbd's and get snapshots
+ - take snapshot if latest snapshot is older than 24 hours
+ - remove snapshots older than 7 days
+
+CephFS:
+- Daily incremental rsync
+- Prune directories older than 7 days
+
+
+Expose some metrics/status for monitoring
+
+
+To use snapshot:
+
+  rbd snap protect image@snap
+  rbd clone image@snap newimagename --image-feature layering
+  rbd map newimagename
+
