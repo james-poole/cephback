@@ -13,28 +13,24 @@ func BackInit() {
 		conn, err = rados.NewConnWithUser(user)
 		logger.Info("Creating ceph connection")
 		if err != nil {
-			logger.Error("Error creating connection.", err)
-			return
+			logger.Fatal("Error creating connection.", err)
 		}
 		logger.Info("Reading ceph config file")
 		err = conn.ReadDefaultConfigFile()
 		if err != nil {
-			logger.Error("Error reading default config file.", err)
-			return
+			logger.Fatal("Error reading default config file.", err)
 		}
 		logger.Info("Connecting to ceph cluster")
 		err = conn.Connect()
 		if err != nil {
-			logger.Error("Error establishing connection.", err)
-			return
+			logger.Fatal("Error establishing connection.", err)
 		}
 	}
 	if iocx == nil {
 		logger.Info("Opening ceph IO Context")
 		iocx, err = conn.OpenIOContext("rbd")
 		if err != nil {
-			logger.Error("Error opening IOContext.", err)
-			return
+			logger.Fatal("Error opening IOContext.", err)
 		}
 	}
 	logger.Infof("instance id: %d", conn.GetInstanceID())
