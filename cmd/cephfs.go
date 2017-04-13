@@ -81,7 +81,6 @@ func processCephFS() bool {
 	BackInit()
 	var bail bool = false
 
-	// check that /storage is mounted to /storage/cephfs
 	cephfsMounted, err := mounted(cephfsMount)
 	if err != nil {
 		logger.Error("CephFS mount check error:", err)
@@ -91,7 +90,7 @@ func processCephFS() bool {
 		logger.Errorf("CephFS not mounted at %s", cephfsMount)
 		bail = true
 	}
-	// check that /backup is mounted (rbd)
+
 	backupMounted, err := mounted(backupMount)
 	if err != nil {
 		logger.Error("Backup mount check error:", err)
@@ -165,16 +164,5 @@ func processCephFS() bool {
 
 	pruneRsyncLogs()
 
-	/*
-		CephFS:
-		- Daily incremental rsync
-		- Prune directories older than 7 days
-		OR
-		- use PV on pod as destination for backup
-		- perform full rsync from cephfs
-		- sync, fsfreeze the rbd inside the pod
-		- take a snapshot
-		- remove snapshots older than 7 days
-	*/
 	return true
 }

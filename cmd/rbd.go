@@ -3,7 +3,6 @@ package cmd
 import (
 	"github.com/ceph/go-ceph/rbd"
 	"github.com/prometheus/client_golang/prometheus"
-	"regexp"
 )
 
 var (
@@ -67,12 +66,6 @@ func processImages() {
 	for i := range images {
 		imageName := images[i]
 		logger.Debug("Processing image:", imageName)
-		// TESTING - REMOVE THIS
-		match, _ := regexp.MatchString("jetest.*", imageName)
-		if !match {
-			continue
-		}
-		// TESTING - REMOVE THIS
 
 		if createSnap(imageName, rbdThresholdMin, false) {
 			metricRBDSnapshotsCreated.Inc()
