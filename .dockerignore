@@ -1,0 +1,5 @@
+.git
+build.sh
+dockerfile_build
+cephback
+cephback_binary

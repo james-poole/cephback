@@ -24,6 +24,8 @@ func BackInit() {
 		err = conn.Connect()
 		if err != nil {
 			logger.Fatal("Error establishing connection.", err)
+		} else {
+			logger.Info("Connected to ceph cluster")
 		}
 	}
 	if iocx == nil {

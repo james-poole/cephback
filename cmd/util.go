@@ -42,10 +42,10 @@ func execHelper(command string, cmdArgs []string) (result bool) {
 	}
 
 	if err != nil {
-		logger.Errorf("command %s returned an error", command, err)
+		logger.Errorf("command %s returned an error: %s", command, err)
 		result = false
 	} else {
-		logger.Errorf("command %s exited successfully", command, err)
+		logger.Errorf("command %s exited successfully", command)
 		result = true
 	}
 	return result

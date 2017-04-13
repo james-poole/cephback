@@ -1,0 +1,13 @@
+FROM golang:1.7.5
+
+RUN \
+  curl -s 'https://download.ceph.com/keys/release.asc' | apt-key add - && \
+  echo deb http://download.ceph.com/debian-jewel/ jessie main > /etc/apt/sources.list.d/ceph.list && \
+  apt-get update && \
+  apt-get -y install librados-dev librbd-dev && \
+  rm -rf /var/lib/apt/lists/*
+ADD . /go/src/github.com/jameseck/cephback
+WORKDIR /go/src/github.com/jameseck/cephback
+RUN \
+  go get && \
+  go build

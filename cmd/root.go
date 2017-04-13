@@ -133,7 +133,7 @@ func init() {
 	RootCmd.PersistentFlags().IntVar(&checkRbdInterval, "rbd-interval", 5, "Interval between RBD snapshot checks (default 5 minutes)")
 	RootCmd.PersistentFlags().StringSliceVar(&imageExclude, "exclude", []string{}, "Images to exclude from processing")
 	RootCmd.PersistentFlags().StringVarP(&httpListen, "listen", "l", ":9090", "Port/IP to listen on (default :9090)")
-	RootCmd.PersistentFlags().StringVar(&cephfsMount, "cephfs-mount", "/storage/cephfs", "Mountpoint for cephfs (default /cephfs)")
+	RootCmd.PersistentFlags().StringVar(&cephfsMount, "cephfs-mount", "/cephfs", "Mountpoint for cephfs (default /cephfs)")
 	RootCmd.PersistentFlags().StringVar(&backupMount, "backup-mount", "/backup", "Mountpoint for backup destination (default /backup)")
 	RootCmd.PersistentFlags().IntVar(&checkCephfsInterval, "cephfs-interval", 5, "Interval between CephFS RBD snapshot checks (default 5 minutes)")
 	RootCmd.PersistentFlags().IntVar(&rsyncCephfsInterval, "cephfs-rsync-interval", 1, "Interval between CephFS rsyncs (default 1 hour)")
