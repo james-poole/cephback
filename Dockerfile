@@ -7,9 +7,14 @@ RUN \
   echo deb http://download.ceph.com/debian-jewel/ jessie main > /etc/apt/sources.list.d/ceph.list && \
   apt-get update && \
   apt-get -y install librados-dev librbd-dev rsync curl telnet && \
-  rm -rf /var/lib/apt/lists/*
+  rm -rf /var/lib/apt/lists/* && \
+  mkdir /etc/cephback
+
 ADD cephback_binary /cephback
 RUN chmod 0755 /cephback
-ENTRYPOINT /cephback
+
+ENV HOME /etc/cephback
 
 EXPOSE 9090
+
+ENTRYPOINT /cephback
