@@ -1,0 +1,6 @@
+To access an RBD snapshot:
+
+  rbd snap protect image@snap
+  rbd clone image@snap newimagename --image-feature layering
+  rbd map newimagename
+
