@@ -8,6 +8,17 @@ metadata:
     description: Provides cephback
   name: cephback
 objects:
+- apiVersion: v1
+  kind: ConfigMap
+  data:
+    cephback.yaml: |
+      user: osrbd
+  kind: ConfigMap
+  metadata:
+    creationTimestamp: null
+    name: cephback
+    namespace: "${NAMESPACE}"
+
 # The ClusterRoleBinding object doesn't make use of the NAMESPACE built-in var, so we have to define it as a parameter
 - apiVersion: v1
   kind: ClusterRoleBinding
@@ -187,6 +198,28 @@ objects:
   metadata:
     creationTimestamp: null
     name: cephback
+
+- apiVersion: v1
+  kind: PersistentVolume
+  metadata:
+    name: cephback
+    labels:
+      cephback: "yes"
+  spec:
+    accessModes:
+    - ReadWriteOnce
+    capacity:
+      storage: 2Ti
+    persistentVolumeReclaimPolicy: Retain
+    rbd:
+      image: cephfs_backup
+      keyring: /etc/ceph/ceph.client.osrbd.keyring
+      monitors:
+      - 192.168.5.1:6789
+      - 192.168.5.2:6789
+      - 192.168.5.3:6789
+      pool: rbd
+      user: osrbd
 
 parameters:
 - name: "PROJECT"

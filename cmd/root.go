@@ -10,6 +10,8 @@ import (
 )
 
 var cfgFile string
+
+// these should all be set by viper.get rather than cobra
 var user string
 var rbdSnapAgeMin int
 var rbdSnapAgeMax int
@@ -36,7 +38,9 @@ var cephfsRsyncArgs []string
 var RootCmd = &cobra.Command{
 	Use:   "cephback",
 	Short: "A service to snapshot RBD's and backup files via rsync",
-
+	PreRun: func(cmd *cobra.Command, args []string) {
+		viper.BindPFlags(cmd.PersistentFlags())
+	},
 	Run: func(cmd *cobra.Command, args []string) {
 
 		out, _ := os.OpenFile("/var/log/cephback.log", os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
@@ -48,6 +52,8 @@ var RootCmd = &cobra.Command{
 		} else {
 			logger.Level = logrus.InfoLevel
 		}
+
+		logger.Infof("Called with arguments %s", os.Args)
 
 		rbdThresholdMin = time.Duration(rbdSnapAgeMin) * time.Hour
 		rbdThresholdMax = time.Duration(rbdSnapAgeMax) * time.Hour
@@ -67,9 +73,9 @@ var RootCmd = &cobra.Command{
 		imageExclude = append(imageExclude, cephfsRbdName)
 		// start the rbd routine
 		logger.Info("Starting RBD routine")
-		processImages()
 		imageTicker := time.NewTicker(checkRbdIntervalMinutes)
 		go func() {
+			processImages()
 			for _ = range imageTicker.C {
 				processImages()
 			}
@@ -77,9 +83,9 @@ var RootCmd = &cobra.Command{
 
 		// start the cephfs routine
 		logger.Info("Starting CephFS routine")
-		processCephFS()
 		cephfsTicker := time.NewTicker(checkCephfsIntervalMinutes)
 		go func() {
+			processCephFS()
 			for _ = range cephfsTicker.C {
 				processCephFS()
 			}
@@ -101,6 +107,7 @@ func Execute() {
 func init() {
 	cobra.OnInitialize(initConfig)
 
+	// replace all below with non-var types (except cfgFile)
 	RootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default is $HOME/cephback.yaml)")
 	RootCmd.PersistentFlags().StringVarP(&user, "user", "u", "admin", "Ceph user")
 	RootCmd.PersistentFlags().BoolVarP(&debug, "debug", "d", false, "Enable debugging")
@@ -120,24 +127,24 @@ func init() {
 	RootCmd.PersistentFlags().IntVar(&cephfsSnapAgeMin, "cephfs-snap-age-min", 24, "Duration in hours since the last snapshot before we take another one")
 	RootCmd.PersistentFlags().IntVar(&cephfsSnapAgeMax, "cephfs-snap-age-max", 168, "Snapshots older in hours than this will be deleted")
 
-	viper.BindPFlag("user", RootCmd.PersistentFlags().Lookup("user"))
-	viper.BindPFlag("debug", RootCmd.PersistentFlags().Lookup("debug"))
-	viper.BindPFlag("rbd-snap-age-min", RootCmd.PersistentFlags().Lookup("rbd-snap-age-min"))
-	viper.BindPFlag("rbd-snap-age-max", RootCmd.PersistentFlags().Lookup("rbd-snap-age-max"))
-	viper.BindPFlag("rbd-interval", RootCmd.PersistentFlags().Lookup("rbd-interval"))
-	viper.BindPFlag("exclude", RootCmd.PersistentFlags().Lookup("exclude"))
-	viper.BindPFlag("listen", RootCmd.PersistentFlags().Lookup("listen"))
-	viper.BindPFlag("cephfs-mount", RootCmd.PersistentFlags().Lookup("cephfs-mount"))
-	viper.BindPFlag("backup-mount", RootCmd.PersistentFlags().Lookup("backup-mount"))
-	viper.BindPFlag("cephfs-interval", RootCmd.PersistentFlags().Lookup("cephfs-interval"))
-	viper.BindPFlag("cephfs-rsync-interval", RootCmd.PersistentFlags().Lookup("cephfs-rsync-interval"))
-	viper.BindPFlag("cephfs-rsync-lock", RootCmd.PersistentFlags().Lookup("cephfs-rsync-lock"))
-	viper.BindPFlag("cephfs-rsync-args", RootCmd.PersistentFlags().Lookup("cephfs-rsync-args"))
-	viper.BindPFlag("cephfs-success-file", RootCmd.PersistentFlags().Lookup("cephfs-success-file"))
-	viper.BindPFlag("cephfs-rbd-name", RootCmd.PersistentFlags().Lookup("cephfs-rbd-name"))
-	viper.BindPFlag("cephfs-snap-age-min", RootCmd.PersistentFlags().Lookup("cephfs-snap-age-min"))
-	viper.BindPFlag("cephfs-snap-age-max", RootCmd.PersistentFlags().Lookup("cephfs-snap-age-max"))
-
+	//	Replaced with BindPFlags call in PreRun
+	//	viper.BindPFlag("user", RootCmd.PersistentFlags().Lookup("user"))
+	//	viper.BindPFlag("debug", RootCmd.PersistentFlags().Lookup("debug"))
+	//	viper.BindPFlag("rbd-snap-age-min", RootCmd.PersistentFlags().Lookup("rbd-snap-age-min"))
+	//	viper.BindPFlag("rbd-snap-age-max", RootCmd.PersistentFlags().Lookup("rbd-snap-age-max"))
+	//	viper.BindPFlag("rbd-interval", RootCmd.PersistentFlags().Lookup("rbd-interval"))
+	//	viper.BindPFlag("exclude", RootCmd.PersistentFlags().Lookup("exclude"))
+	//	viper.BindPFlag("listen", RootCmd.PersistentFlags().Lookup("listen"))
+	//	viper.BindPFlag("cephfs-mount", RootCmd.PersistentFlags().Lookup("cephfs-mount"))
+	//	viper.BindPFlag("backup-mount", RootCmd.PersistentFlags().Lookup("backup-mount"))
+	//	viper.BindPFlag("cephfs-interval", RootCmd.PersistentFlags().Lookup("cephfs-interval"))
+	//	viper.BindPFlag("cephfs-rsync-interval", RootCmd.PersistentFlags().Lookup("cephfs-rsync-interval"))
+	//	viper.BindPFlag("cephfs-rsync-lock", RootCmd.PersistentFlags().Lookup("cephfs-rsync-lock"))
+	//	viper.BindPFlag("cephfs-rsync-args", RootCmd.PersistentFlags().Lookup("cephfs-rsync-args"))
+	//	viper.BindPFlag("cephfs-success-file", RootCmd.PersistentFlags().Lookup("cephfs-success-file"))
+	//	viper.BindPFlag("cephfs-rbd-name", RootCmd.PersistentFlags().Lookup("cephfs-rbd-name"))
+	//	viper.BindPFlag("cephfs-snap-age-min", RootCmd.PersistentFlags().Lookup("cephfs-snap-age-min"))
+	//	viper.BindPFlag("cephfs-snap-age-max", RootCmd.PersistentFlags().Lookup("cephfs-snap-age-max"))
 }
 
 // initConfig reads in config file and ENV variables if set.

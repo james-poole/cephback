@@ -1,0 +1,5 @@
+oc new-project cephback
+oc -n cephback delete egressnetworkpolicy default
+oc adm pod-network join-projects --to cephback monitoring
+oc annotate namespace cephback openshift.io/node-selector="region=infra"
+oc -n cephback adm policy add-scc-to-user privileged -z cephback
