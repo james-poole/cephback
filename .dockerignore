@@ -2,3 +2,4 @@
 build.sh
 dockerfile_build
 cephback
+vendor

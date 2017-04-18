@@ -4,13 +4,14 @@ Iterate through all rbd's and get snapshots
  - remove snapshots older than X days
 
 CephFS:
-- rsync to RBD including post fsfreeze and snapshot
+- rsync to rbd including post fsfreeze and snapshot
 - remove snapshots older than X days
 
 TODO:
-- Ensure snapshot delete for backup RBD doesn't remove snapshots if there are less than X - if backup fails we don't want to end up with zero snapshots
+- Ensure snapshot delete for backup rbd doesn't remove snapshots if there are less than X - if backup fails we don't want to end up with zero snapshots
 - Make the /healthz endpoint expose something useful
 - Expose metric on number of images that don't have a snapshot new enough?
 - Expose metric for number of protected snapshots
 - Expose metric for size of last cephfs rsync
-
+- Handle the ceph pool properly - at the moment we assume it's always rbd
+- Better handling if the cephfs_backup rbd does not exist

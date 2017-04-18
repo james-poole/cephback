@@ -76,11 +76,11 @@ func matchSnapName(name string, regex string) bool {
 func getSnapshots(imageName string) (snaps []rbd.SnapInfo) {
 	img := rbd.GetImage(iocx, imageName)
 	img.Open()
-	defer img.Close()
 	snaps, err := img.GetSnapshotNames()
 	if err != nil {
 		logger.Errorf("Error getting snapshots for image %s: %s", cephfsRbdName, err.Error())
 	}
+	img.Close()
 	return snaps
 }
 

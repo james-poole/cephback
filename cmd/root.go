@@ -31,6 +31,7 @@ var backupMount string
 var cephfsSuccessFile string
 var cephfsRbdName string
 var cephfsRsyncLock string
+var cephfsRsyncArgs []string
 
 var RootCmd = &cobra.Command{
 	Use:   "cephback",
@@ -113,8 +114,10 @@ func init() {
 	RootCmd.PersistentFlags().IntVar(&checkCephfsInterval, "cephfs-interval", 60, "Interval in minutes between CephFS RBD snapshot checks")
 	RootCmd.PersistentFlags().IntVar(&rsyncCephfsInterval, "cephfs-rsync-interval", 24, "Interval in hours between CephFS rsyncs")
 	RootCmd.PersistentFlags().StringVar(&cephfsRsyncLock, "cephfs-rsync-lock", "/backup/rsync.lock", "Path to lock file for CephFS rsync")
+	RootCmd.PersistentFlags().StringSliceVar(&cephfsRsyncArgs, "cephfs-rsync-args", []string{"-ah", "--delete", "--delete-excluded"}, "Rsync args for the cephfs backup")
 	RootCmd.PersistentFlags().StringVar(&cephfsSuccessFile, "cephfs-success-file", "/backup/rsync_success", "Path to CephFS rsync success file")
 	RootCmd.PersistentFlags().StringVar(&cephfsRbdName, "cephfs-rbd-name", "cephfs_backup", "RBD name that CephFS is backed up to")
+	RootCmd.PersistentFlags().IntVar(&cephfsSnapAgeMin, "cephfs-snap-age-min", 24, "Duration in hours since the last snapshot before we take another one")
 	RootCmd.PersistentFlags().IntVar(&cephfsSnapAgeMax, "cephfs-snap-age-max", 168, "Snapshots older in hours than this will be deleted")
 
 	viper.BindPFlag("user", RootCmd.PersistentFlags().Lookup("user"))
@@ -129,8 +132,10 @@ func init() {
 	viper.BindPFlag("cephfs-interval", RootCmd.PersistentFlags().Lookup("cephfs-interval"))
 	viper.BindPFlag("cephfs-rsync-interval", RootCmd.PersistentFlags().Lookup("cephfs-rsync-interval"))
 	viper.BindPFlag("cephfs-rsync-lock", RootCmd.PersistentFlags().Lookup("cephfs-rsync-lock"))
+	viper.BindPFlag("cephfs-rsync-args", RootCmd.PersistentFlags().Lookup("cephfs-rsync-args"))
 	viper.BindPFlag("cephfs-success-file", RootCmd.PersistentFlags().Lookup("cephfs-success-file"))
 	viper.BindPFlag("cephfs-rbd-name", RootCmd.PersistentFlags().Lookup("cephfs-rbd-name"))
+	viper.BindPFlag("cephfs-snap-age-min", RootCmd.PersistentFlags().Lookup("cephfs-snap-age-min"))
 	viper.BindPFlag("cephfs-snap-age-max", RootCmd.PersistentFlags().Lookup("cephfs-snap-age-max"))
 
 }

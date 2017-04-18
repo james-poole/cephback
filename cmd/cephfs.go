@@ -125,14 +125,12 @@ func processCephFS() bool {
 
 		logFileName := fmt.Sprintf("%s/rsync_%s.log", backupMount, time.Now().Format(rsyncLogFileFormat))
 
-		cmdArgs := []string{
-			"-ah",
-			"--delete",
-			"--delete-excluded",
-			fmt.Sprintf("--log-file=%s", logFileName),
+		var cmdArgs []string
+		cmdArgs = append(cmdArgs, cephfsRsyncArgs...)
+		cmdArgs = append(cmdArgs, []string{fmt.Sprintf("--log-file=%s", logFileName),
 			fmt.Sprintf("%s/", cephfsMount),
 			fmt.Sprintf("%s/backup/", backupMount),
-		}
+		}...)
 
 		if execHelper("rsync", cmdArgs) {
 			// touch success file

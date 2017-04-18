@@ -40,6 +40,7 @@ func excludeImages(images []string) []string {
 		l := len(images)
 		for i < l {
 			if images[i] == imageExclude[x] {
+				logger.Infof("Excluding image %s", images[i])
 				images = append(images[:i], images[i+1:]...)
 				l--
 			} else {
