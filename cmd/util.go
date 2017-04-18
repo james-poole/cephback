@@ -42,7 +42,7 @@ func execHelper(command string, cmdArgs []string) (result bool) {
 	}
 
 	if err != nil {
-		logger.Errorf("command %s returned an error: %s", command, err)
+		logger.Errorf("command %s returned an error: %s", command, err.Error())
 		result = false
 	} else {
 		logger.Errorf("command %s exited successfully", command)
@@ -79,7 +79,7 @@ func getSnapshots(imageName string) (snaps []rbd.SnapInfo) {
 	defer img.Close()
 	snaps, err := img.GetSnapshotNames()
 	if err != nil {
-		logger.Errorf("Error getting snapshots for image %s: %s", cephfsRbdName, err)
+		logger.Errorf("Error getting snapshots for image %s: %s", cephfsRbdName, err.Error())
 	}
 	return snaps
 }
@@ -122,7 +122,7 @@ func createSnap(imageName string, younger_than time.Duration, freeze bool) bool 
 		}
 
 		if err != nil {
-			logger.Errorf("Error creating snapshot %s@%s: %s", imageName, snapName, err)
+			logger.Errorf("Error creating snapshot %s@%s: %s", imageName, snapName, err.Error())
 			return false
 		}
 		return true
@@ -152,7 +152,7 @@ func deleteSnap(imageName string, older_than time.Duration) bool {
 					s := img.GetSnapshot(snap.Name)
 					protected, err := s.IsProtected()
 					if err != nil {
-						logger.Errorf("Error checking if snapshot is protected %s@%s: %s", imageName, snap.Name, err)
+						logger.Errorf("Error checking if snapshot is protected %s@%s: %s", imageName, snap.Name, err.Error())
 					}
 					if protected {
 						logger.Errorf("Cannot delete protected snapshot %s@%s", imageName, snap.Name)
@@ -162,7 +162,7 @@ func deleteSnap(imageName string, older_than time.Duration) bool {
 							logger.Infof("Deleting snapshot %s@%s", imageName, snap.Name)
 							return true
 						} else {
-							logger.Errorf("Error deleting snapshot %s@%s: %s", imageName, snap.Name, err)
+							logger.Errorf("Error deleting snapshot %s@%s: %s", imageName, snap.Name, err.Error())
 						}
 					}
 				}

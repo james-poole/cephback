@@ -1,6 +1,8 @@
 package cmd
 
 import (
+	"errors"
+	"fmt"
 	"github.com/ceph/go-ceph/rados"
 )
 
@@ -8,32 +10,28 @@ var conn *rados.Conn
 var iocx *rados.IOContext
 var err error
 
-func BackInit() {
+func CephConnInit() error {
 	if conn == nil {
-		conn, err = rados.NewConnWithUser(user)
 		logger.Info("Creating ceph connection")
-		if err != nil {
-			logger.Fatal("Error creating connection.", err)
+		if conn, err = rados.NewConnWithUser(user); err != nil {
+			return errors.New(fmt.Sprintf("Error creating connection. %s", err))
 		}
 		logger.Info("Reading ceph config file")
-		err = conn.ReadDefaultConfigFile()
-		if err != nil {
-			logger.Fatal("Error reading default config file.", err)
+		if err = conn.ReadDefaultConfigFile(); err != nil {
+			return errors.New(fmt.Sprintf("Error reading default config file. %s", err))
 		}
 		logger.Info("Connecting to ceph cluster")
-		err = conn.Connect()
-		if err != nil {
-			logger.Fatal("Error establishing connection.", err)
+		if err = conn.Connect(); err != nil {
+			return errors.New(fmt.Sprintf("Error establishing connection to ceph. %s", err))
 		} else {
 			logger.Info("Connected to ceph cluster")
 		}
 	}
 	if iocx == nil {
 		logger.Info("Opening ceph IO Context")
-		iocx, err = conn.OpenIOContext("rbd")
-		if err != nil {
-			logger.Fatal("Error opening IOContext.", err)
+		if iocx, err = conn.OpenIOContext("rbd"); err != nil {
+			return errors.New(fmt.Sprintf("Error opening IOContext. %s", err))
 		}
 	}
-	logger.Infof("instance id: %d", conn.GetInstanceID())
+	return nil
 }

@@ -47,7 +47,7 @@ func pruneRsyncLogs() bool {
 
 	files, err := ioutil.ReadDir(backupMount)
 	if err != nil {
-		logger.Errorf("Error reading %s directory:%s", backupMount, err)
+		logger.Errorf("Error reading %s directory:%s", backupMount, err.Error())
 		return false
 	}
 
@@ -59,7 +59,7 @@ func pruneRsyncLogs() bool {
 		}
 		age, err := time.Parse(layout, timestamp[1])
 		if err != nil {
-			logger.Errorf("Error parsing rsync log file timestamp %s: %s", timestamp[1], err)
+			logger.Errorf("Error parsing rsync log file timestamp %s: %s", timestamp[1], err.Error())
 			continue
 		}
 
@@ -78,12 +78,12 @@ func pruneRsyncLogs() bool {
 
 func processCephFS() bool {
 
-	BackInit()
+	CephConnInit()
 	var bail bool = false
 
 	cephfsMounted, err := mounted(cephfsMount)
 	if err != nil {
-		logger.Error("CephFS mount check error:", err)
+		logger.Error("CephFS mount check error:", err.Error())
 		bail = true
 	}
 	if !cephfsMounted {
@@ -93,7 +93,7 @@ func processCephFS() bool {
 
 	backupMounted, err := mounted(backupMount)
 	if err != nil {
-		logger.Error("Backup mount check error:", err)
+		logger.Error("Backup mount check error:", err.Error())
 		bail = true
 	}
 	if !backupMounted {
@@ -140,13 +140,13 @@ func processCephFS() bool {
 			if os.IsNotExist(err) {
 				var file, err = os.Create(cephfsSuccessFile)
 				if err != nil {
-					logger.Error("Rsync success file could not be created", err)
+					logger.Error("Rsync success file could not be created", err.Error())
 				}
 				file.Close()
 			} else {
 				now := time.Now()
 				if err := os.Chtimes(cephfsSuccessFile, now, now); err != nil {
-					logger.Error("There was an error updating the rsync success file timestamp:", err)
+					logger.Error("There was an error updating the rsync success file timestamp:", err.Error())
 				}
 			}
 		}

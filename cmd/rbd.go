@@ -1,7 +1,7 @@
 package cmd
 
 import (
-	"github.com/ceph/go-ceph/rbd"
+	//	"github.com/ceph/go-ceph/rbd"
 	"github.com/prometheus/client_golang/prometheus"
 )
 
@@ -53,15 +53,23 @@ func excludeImages(images []string) []string {
 
 func processImages() {
 
-	BackInit()
-	// Get images - should probably get the list from openshift bound pv's instead of all rbd's
-	images, err := rbd.GetImageNames(iocx)
-	images = excludeImages(images)
-	if err != nil {
-		logger.Fatal("Error getting image names.", err)
+	if err = CephConnInit(); err != nil {
+		logger.Error(err.Error())
+		return
 	}
+	// Get images - get the list from openshift bound pv's instead of all rbd's
+	//	images, err := rbd.GetImageNames(iocx)
+	//	if err != nil {
+	//		logger.Fatal("Error getting image names.", err)
+	//	}
+	images, err := getRbdPvImages()
+	if err != nil {
+		logger.Error(err.Error())
+		return
+	}
+	images = excludeImages(images)
 
-	logger.Info("Processing images")
+	logger.Infof("Processing %d images", len(images))
 
 	for i := range images {
 		imageName := images[i]
@@ -77,5 +85,4 @@ func processImages() {
 
 		metricRBDImagesChecked.Inc()
 	}
-
 }

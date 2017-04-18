@@ -23,7 +23,7 @@ func httpServe() {
 		http.Handle("/metrics", promhttp.Handler())
 		err := http.ListenAndServe(httpListen, nil)
 		if err != nil {
-			logger.Fatal("ListenAndServe: ", err)
+			logger.Fatal("ListenAndServe: ", err.Error())
 		}
 	}()
 }

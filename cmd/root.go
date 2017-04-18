@@ -38,7 +38,7 @@ var RootCmd = &cobra.Command{
 
 	Run: func(cmd *cobra.Command, args []string) {
 
-		out, _ := os.OpenFile("cephback.log", os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
+		out, _ := os.OpenFile("/var/log/cephback.log", os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
 		multi := io.MultiWriter(out, os.Stderr)
 		logger.Out = multi
 		logger.Formatter = &logrus.TextFormatter{}
@@ -57,7 +57,10 @@ var RootCmd = &cobra.Command{
 
 		httpServe()
 
-		BackInit()
+		if err = CephConnInit(); err != nil {
+			logger.Error(err.Error())
+			return
+		}
 
 		// remove the cephfs rbd from the list - we'll handle this separately
 		imageExclude = append(imageExclude, cephfsRbdName)
@@ -89,7 +92,7 @@ var RootCmd = &cobra.Command{
 // This is called by main.main(). It only needs to happen once to the rootCmd.
 func Execute() {
 	if err := RootCmd.Execute(); err != nil {
-		logger.Error(err)
+		logger.Error(err.Error())
 		os.Exit(-1)
 	}
 }
