@@ -1,3 +1,6 @@
 cephback
 cephback_binary
 *.swp
+go/bin/*
+Gopkg.lock
+vendor

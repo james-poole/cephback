@@ -9,5 +9,7 @@ RUN \
 ADD . /go/src/github.com/jameseck/cephback
 WORKDIR /go/src/github.com/jameseck/cephback
 RUN \
+  go get k8s.io/client-go/kubernetes && \
+  git -C /go/src/k8s.io/client-go checkout v2.0.0 && \
   go get && \
   go build

@@ -1,0 +1,28 @@
+
+[[dependencies]]
+  branch = "master"
+  name = "github.com/Sirupsen/logrus"
+
+[[dependencies]]
+  branch = "master"
+  name = "github.com/alexflint/go-filemutex"
+
+[[dependencies]]
+  branch = "master"
+  name = "github.com/ceph/go-ceph"
+
+[[dependencies]]
+  branch = "master"
+  name = "github.com/prometheus/client_golang"
+
+[[dependencies]]
+  branch = "master"
+  name = "github.com/spf13/cobra"
+
+[[dependencies]]
+  branch = "master"
+  name = "github.com/spf13/viper"
+
+[[dependencies]]
+  name = "k8s.io/client-go"
+  version = "v2.0.0"
