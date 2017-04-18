@@ -1,4 +1,4 @@
-FROM golang:1.7.5
+FROM golang:1.8.1
 
 RUN \
   curl -s 'https://download.ceph.com/keys/release.asc' | apt-key add - && \
@@ -6,10 +6,11 @@ RUN \
   apt-get update && \
   apt-get -y install librados-dev librbd-dev && \
   rm -rf /var/lib/apt/lists/*
-ADD . /go/src/github.com/jameseck/cephback
+#ADD . /go/src/github.com/jameseck/cephback
+RUN \
+  go get -u github.com/golang/dep/... && \
+  go get -d github.com/jameseck/cephback
 WORKDIR /go/src/github.com/jameseck/cephback
 RUN \
-  go get k8s.io/client-go/kubernetes && \
-  git -C /go/src/k8s.io/client-go checkout v2.0.0 && \
-  go get && \
-  go build
+  dep ensure -update && \
+  go install

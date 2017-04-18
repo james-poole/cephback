@@ -1,0 +1,199 @@
+---
+apiVersion: v1
+kind: Template
+labels:
+  template: cephback
+metadata:
+  annotations:
+    description: Provides cephback
+  name: cephback
+objects:
+# The ClusterRoleBinding object doesn't make use of the NAMESPACE built-in var, so we have to define it as a parameter
+- apiVersion: v1
+  kind: ClusterRoleBinding
+  metadata:
+    name: cephback-cluster-reader
+  roleRef:
+    name: cluster-reader
+  subjects:
+  - kind: ServiceAccount
+    name: cephback
+    namespace: "${PROJECT}"
+
+- kind: ImageStream
+  apiVersion: v1
+  metadata:
+    name: cephback
+    annotations:
+      openshift.io/display-name: cephback
+  spec:
+    tags:
+    - name: latest
+      annotations:
+        openshift.io/display-name: Cephback
+        description: |-
+          Cephback provides a service which snapshots RBD-backed PV's and rsync backup for cephfs
+        iconClass: icon-go-gopher
+        tags: cephback
+      from:
+        kind: DockerImage
+        name: jameseckersall/cephback:latest
+
+- apiVersion: v1
+  kind: DeploymentConfig
+  metadata:
+    name: cephback
+    namespace: "${NAMESPACE}"
+    labels:
+      app: cephback
+  spec:
+    replicas: 1
+    strategy:
+      type: Recreate
+    template:
+      metadata:
+        name: cephback
+        labels:
+          app: cephback
+      spec:
+        nodeSelector:
+          region: infra
+        graceTerminationPeriod: 120s
+        containers:
+        - name: cephback
+          image: " "
+          imagePullPolicy: Always
+          ports:
+          - name: cephback
+            containerPort: 9090
+          livenessProbe:
+            initialDelay: 60
+            failureThreshold: 3
+            httpGet:
+              path: /metrics
+              port: 9090
+              scheme: HTTP
+            periodSeconds: 10
+            successThreshold: 1
+            timeoutSeconds: 3
+          readinessProbe:
+            initialDelay: 30
+            failureThreshold: 10
+            httpGet:
+              path: /metrics
+              port: 9090
+              scheme: HTTP
+            periodSeconds: 10
+            successThreshold: 1
+            timeoutSeconds: 3
+          resources:
+            requests:
+              cpu: 500m
+              memory: 2048M
+            limits:
+              cpu: 500m
+              memory: 2048M
+          volumeMounts:
+          - name: config-volume
+            mountPath: /etc/cephback
+          - name: cephdir
+            mountPath: /etc/ceph
+          - name: backupdir
+            mountPath: /backup
+          - name: cephfsdir
+            mountPath: /cephfs
+          securityContext:
+            privileged: true
+        serviceAccountName: cephback
+        volumes:
+        - name: config-volume
+          configMap:
+            name: cephback
+        - name: cephdir
+          hostPath:
+            path: /etc/ceph
+        - name: cephfsdir
+          hostPath:
+            path: /storage/cephfs
+        - name: backupdir
+          persistentVolumeClaim:
+            claimName: cephback
+    triggers:
+    - type: ConfigChange
+    - type: ImageChange
+      imageChangeParams:
+        automatic: true
+        containerNames:
+        - cephback
+        from:
+          kind: ImageStreamTag
+          name: cephback:latest
+
+- apiVersion: v1
+  kind: PersistentVolumeClaim
+  metadata:
+    name: cephback
+    namespace: "${NAMESPACE}"
+  spec:
+    accessModes:
+    - ReadWriteOnce
+    resources:
+      requests:
+        storage: 2Ti
+    selector:
+      matchLabels:
+        cephback: "yes"
+
+- apiVersion: v1
+  kind: Service
+  metadata:
+    name: cephback
+    namespace: "${NAMESPACE}"
+    labels:
+      app: cephback
+    annotations:
+      prometheus.io/scrape: 'true'
+  spec:
+    type: ClusterIP
+    ports:
+      - port: 9090
+        protocol: TCP
+        name: 9090-tcp
+    selector:
+      app: cephback
+      deploymentconfig: cephback
+
+- apiVersion: v1
+  kind: Route
+  metadata:
+    labels:
+      name: cephback
+    name: cephback
+    namespace: "${NAMESPACE}"
+  spec:
+    host: "${CEPHBACK_URL}"
+    port:
+      targetPort: 9090-tcp
+    to:
+      kind: Service
+      name: cephback
+      weight: 100
+    tls:
+      termination: edge
+      insecureEdgeTerminationPolicy: Redirect
+
+- apiVersion: v1
+  kind: ServiceAccount
+  metadata:
+    creationTimestamp: null
+    name: cephback
+
+parameters:
+- name: "PROJECT"
+  required: true
+  displayName: "Namespace destination for these objects (probably cephback)"
+- name: "CEPHBACK_URL"
+  required: true
+  displayName: "URL for Cephback"
+  description: "URL for Cephback (without the http/https prefix)"
+  value: "cephback.example.com"

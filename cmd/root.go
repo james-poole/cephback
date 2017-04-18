@@ -100,10 +100,10 @@ func Execute() {
 func init() {
 	cobra.OnInitialize(initConfig)
 
-	RootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default is $HOME/.cephback.yaml)")
+	RootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default is $HOME/cephback.yaml)")
 	RootCmd.PersistentFlags().StringVarP(&user, "user", "u", "admin", "Ceph user")
 	RootCmd.PersistentFlags().BoolVarP(&debug, "debug", "d", false, "Enable debugging")
-	RootCmd.PersistentFlags().IntVar(&rbdSnapAgeMin, "rbd-snap-age-min", 6, "Duration in hours since the last snapshot before we take another one")
+	RootCmd.PersistentFlags().IntVar(&rbdSnapAgeMin, "rbd-snap-age-min", 24, "Duration in hours since the last snapshot before we take another one")
 	RootCmd.PersistentFlags().IntVar(&rbdSnapAgeMax, "rbd-snap-age-max", 168, "Snapshots older in hours than this will be deleted")
 	RootCmd.PersistentFlags().IntVar(&checkRbdInterval, "rbd-interval", 60, "Interval in minutes between RBD snapshot checks")
 	RootCmd.PersistentFlags().StringSliceVar(&imageExclude, "exclude", []string{}, "Images to exclude from processing")
@@ -111,7 +111,7 @@ func init() {
 	RootCmd.PersistentFlags().StringVar(&cephfsMount, "cephfs-mount", "/cephfs", "Mountpoint for cephfs")
 	RootCmd.PersistentFlags().StringVar(&backupMount, "backup-mount", "/backup", "Mountpoint for backup destination")
 	RootCmd.PersistentFlags().IntVar(&checkCephfsInterval, "cephfs-interval", 60, "Interval in minutes between CephFS RBD snapshot checks")
-	RootCmd.PersistentFlags().IntVar(&rsyncCephfsInterval, "cephfs-rsync-interval", 1, "Interval between CephFS rsyncs")
+	RootCmd.PersistentFlags().IntVar(&rsyncCephfsInterval, "cephfs-rsync-interval", 24, "Interval in hours between CephFS rsyncs")
 	RootCmd.PersistentFlags().StringVar(&cephfsRsyncLock, "cephfs-rsync-lock", "/backup/rsync.lock", "Path to lock file for CephFS rsync")
 	RootCmd.PersistentFlags().StringVar(&cephfsSuccessFile, "cephfs-success-file", "/backup/rsync_success", "Path to CephFS rsync success file")
 	RootCmd.PersistentFlags().StringVar(&cephfsRbdName, "cephfs-rbd-name", "cephfs_backup", "RBD name that CephFS is backed up to")
