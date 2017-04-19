@@ -1,3 +1,4 @@
+rbd --name=client.osrbd create cephfs_backup --size=2T --image-feature layering
 oc new-project cephback
 oc -n cephback delete egressnetworkpolicy default
 oc adm pod-network join-projects --to cephback monitoring

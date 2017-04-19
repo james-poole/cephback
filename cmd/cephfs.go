@@ -127,7 +127,8 @@ func processCephFS() bool {
 
 		var cmdArgs []string
 		cmdArgs = append(cmdArgs, cephfsRsyncArgs...)
-		cmdArgs = append(cmdArgs, []string{fmt.Sprintf("--log-file=%s", logFileName),
+		cmdArgs = append(cmdArgs, []string{
+			fmt.Sprintf("--log-file=%s", logFileName),
 			fmt.Sprintf("%s/", cephfsMount),
 			fmt.Sprintf("%s/backup/", backupMount),
 		}...)

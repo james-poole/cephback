@@ -12,8 +12,8 @@ var err error
 
 func CephConnInit() error {
 	if conn == nil {
-		logger.Infof("Creating ceph connection with user %s", user)
-		if conn, err = rados.NewConnWithUser(user); err != nil {
+		logger.Infof("Creating ceph connection with user %s", cephUser)
+		if conn, err = rados.NewConnWithUser(cephUser); err != nil {
 			return errors.New(fmt.Sprintf("Error creating connection. %s", err))
 		}
 		logger.Info("Reading ceph config file")

@@ -12,7 +12,7 @@ objects:
   kind: ConfigMap
   data:
     cephback.yaml: |
-      user: osrbd
+      ceph-user: osrbd
   kind: ConfigMap
   metadata:
     creationTimestamp: null
@@ -113,6 +113,7 @@ objects:
             mountPath: /backup
           - name: cephfsdir
             mountPath: /cephfs
+            readOnly: true
           securityContext:
             privileged: true
         serviceAccountName: cephback
