@@ -8,10 +8,15 @@ CephFS:
 - remove snapshots older than X days
 
 TODO:
-- Ensure snapshot delete for backup rbd doesn't remove snapshots if there are less than X - if backup fails we don't want to end up with zero snapshots
 - Make the /healthz endpoint expose something useful
+  - another ticker that checks that each rbd has a snapshot within interval and that rsync success is within rsync interval
 - Expose metric on number of images that don't have a snapshot new enough?
 - Expose metric for number of protected snapshots
-- Expose metric for size of last cephfs rsync
+- Expose metric for size of last cephfs rsync - needs to parse rsync log file...tricky
 - Handle the ceph pool properly - at the moment we assume it's always rbd
 - Better handling if the cephfs_backup rbd does not exist
+Y - Expose metric for last success file of cephfs rsync - 0 = running
+Y - Expose metric for cephfs rbd space free
+Y - Ensure snapshot delete for backup rbd doesn't remove snapshots if there are less than X - if backup fails we don't want to end up with zero snapshots
+Y - add inotify/watch on config file - will not work for the tickers without some rework though
+- Fix health check on snapshot age - reports no snapshot within time period on a newly created pv

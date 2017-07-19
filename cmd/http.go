@@ -11,7 +11,7 @@ func httpHello(w http.ResponseWriter, r *http.Request) {
 }
 
 func httpHealthz(w http.ResponseWriter, r *http.Request) {
-	fmt.Fprintf(w, "OK") // send data to client side
+	fmt.Fprintf(w, health.Status()) // send data to client side
 }
 
 func httpServe() {

@@ -12,7 +12,6 @@ import (
 
 var cephFSSnapshotRegex = "cephfs_[0-9]{4}-[0-9]{2}-[0-9]{2}_[0-9]{2}:[0-9]{2}"
 var cephFSLastSuccess time.Time
-var rsyncCephfsIntervalHours time.Duration
 var rsyncLogFileFormat = "2006-01-02_15:04"
 
 var (
@@ -34,12 +33,61 @@ var (
 			Help: "How many rsyncs we have performed",
 		},
 	)
+	metricCephFSRsyncLastSuccess = prometheus.NewGauge(
+		prometheus.GaugeOpts{
+			Name: "cephback_cephfs_rsync_last_success",
+			Help: "The epoch timestamp of the last successful CephFS rsync",
+		},
+	)
+	metricCephFSRsyncRunning = prometheus.NewGauge(
+		prometheus.GaugeOpts{
+			Name: "cephback_cephfs_rsync_running",
+			Help: "Whether the CephFS rsync is running",
+		},
+	)
+	metricCephFSSpaceUsed = prometheus.NewGaugeFunc(
+		prometheus.GaugeOpts{
+			Name: "cephback_cephfs_used_bytes",
+			Help: "Number of bytes used on CephFS",
+		}, func() float64 { return float64(cephfsSpaceUsed(cephfsMount)) },
+	)
+	metricCephFSBackupRBDSpaceUsed = prometheus.NewGaugeFunc(
+		prometheus.GaugeOpts{
+			Name: "cephback_cephfs_backup_rbd_used_bytes",
+			Help: "Number of bytes used on the CephFS backup RBD",
+		}, func() float64 { return float64(DiskUsage(backupMount).Used) },
+	)
+	metricCephFSBackupRBDSpaceFree = prometheus.NewGaugeFunc(
+		prometheus.GaugeOpts{
+			Name: "cephback_cephfs_backup_rbd_free_bytes",
+			Help: "Number of bytes free on the CephFS backup RBD",
+		}, func() float64 { return float64(DiskUsage(backupMount).Free) },
+	)
 )
 
 func init() {
 	prometheus.MustRegister(metricCephFSSnapshotsCreated)
 	prometheus.MustRegister(metricCephFSSnapshotsDeleted)
 	prometheus.MustRegister(metricRsyncPerformed)
+	prometheus.MustRegister(metricCephFSRsyncLastSuccess)
+	prometheus.MustRegister(metricCephFSRsyncRunning)
+	prometheus.MustRegister(metricCephFSSpaceUsed)
+	prometheus.MustRegister(metricCephFSBackupRBDSpaceUsed)
+	prometheus.MustRegister(metricCephFSBackupRBDSpaceFree)
+}
+
+func cephfsSpaceUsed(path string) int64 {
+	dir, err := os.Open(path)
+	if err != nil {
+		logger.Errorf("Unable to read CephFS directory to get space used: %s", err.Error())
+		return 0
+	}
+	fi, err := dir.Stat()
+	if err != nil {
+		logger.Errorf("Unable to stat CephFS directory to get space used: %s", err.Error())
+		return 0
+	}
+	return fi.Size()
 }
 
 func pruneRsyncLogs() bool {
@@ -63,7 +111,7 @@ func pruneRsyncLogs() bool {
 			continue
 		}
 
-		if time.Since(age) > cephfsThresholdMax {
+		if time.Since(age) > cephfsSnapAgeMax {
 			filepath := fmt.Sprintf("%s/%s", backupMount, file.Name())
 			err = os.Remove(filepath)
 			if err == nil {
@@ -108,20 +156,22 @@ func processCephFS() bool {
 
 	// look for last rsync success file timestamp /backup/last_success
 
-	rsyncCephfsIntervalHours = time.Duration(rsyncCephfsInterval) * time.Hour
 	if successFile, err := os.Stat(cephfsSuccessFile); err == nil {
 		cephFSLastSuccess = successFile.ModTime()
 	} else {
 		cephFSLastSuccess = time.Time{} // epoch 0
 	}
+	metricCephFSRsyncLastSuccess.Set(float64(cephFSLastSuccess.Unix()))
 
-	if time.Since(cephFSLastSuccess) > rsyncCephfsIntervalHours {
+	if time.Since(cephFSLastSuccess) > rsyncCephfsInterval {
 		m, err := filemutex.New(cephfsRsyncLock)
 		if err != nil {
 			logger.Error("Rsync lock file could not created")
 		}
 
 		m.Lock() // Will block until lock can be acquired - should consider whether to use the non-blocking method
+
+		metricCephFSRsyncRunning.Set(1.0)
 
 		logFileName := fmt.Sprintf("%s/rsync_%s.log", backupMount, time.Now().Format(rsyncLogFileFormat))
 
@@ -133,7 +183,8 @@ func processCephFS() bool {
 			fmt.Sprintf("%s/backup/", backupMount),
 		}...)
 
-		if execHelper("rsync", cmdArgs) {
+		if execHelper("rsync", cmdArgs, cephfsRsyncValidExitCodes) {
+			metricRsyncPerformed.Inc()
 			// touch success file
 			var _, err = os.Stat(cephfsSuccessFile)
 			if os.IsNotExist(err) {
@@ -149,17 +200,13 @@ func processCephFS() bool {
 				}
 			}
 		}
+		metricCephFSRsyncRunning.Set(0.0)
 
 		m.Unlock()
 	}
 
-	if createSnap(cephfsRbdName, cephfsThresholdMin, true) {
-		metricCephFSSnapshotsCreated.Inc()
-	}
-
-	if deleteSnap(cephfsRbdName, cephfsThresholdMax) {
-		metricCephFSSnapshotsDeleted.Inc()
-	}
+	metricCephFSSnapshotsCreated.Add(float64(createSnap(cephfsRbdName, cephfsSnapAgeMin, true)))
+	metricCephFSSnapshotsDeleted.Add(float64(deleteSnap(cephfsRbdName, cephfsSnapAgeMax, cephfsSnapCountMin)))
 
 	pruneRsyncLogs()
 

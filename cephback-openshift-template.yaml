@@ -13,6 +13,10 @@ objects:
   data:
     cephback.yaml: |
       ceph-user: osrbd
+      cephfs-snap-count-min: 5
+      cephfs-snap-age-max: 120h
+      rbd-snap-count-min: 5
+      rbd-snap-age-max: 120h
   kind: ConfigMap
   metadata:
     creationTimestamp: null
@@ -100,10 +104,10 @@ objects:
           resources:
             requests:
               cpu: 500m
-              memory: 2048M
+              memory: 4096M
             limits:
               cpu: 500m
-              memory: 2048M
+              memory: 4096M
           volumeMounts:
           - name: config-volume
             mountPath: /etc/cephback

@@ -16,7 +16,19 @@ var (
 	)
 )
 
-func getRbdPvImages() ([]string, error) {
+func getBoundRbdPvImages() ([]string, error) {
+
+	boundPVImages, err := getRbdPvImages("Bound")
+	if err != nil {
+		return nil, err
+	}
+
+	logger.Infof("Found %d bound RBD persistent volumes in the cluster\n", len(boundPVImages))
+	metricBoundPVFound.Set(float64(len(boundPVImages)))
+	return boundPVImages, nil
+}
+
+func getRbdPvImages(phase string) ([]string, error) {
 	// creates the in-cluster config
 	config, err := rest.InClusterConfig()
 	if err != nil {
@@ -32,18 +44,16 @@ func getRbdPvImages() ([]string, error) {
 		return nil, err
 	}
 
-	var boundPVImages []string
+	var matchingPVImages []string
 
 	for x := range pv.Items {
 		p := pv.Items[x]
-		if p.Status.Phase == "Bound" {
+		if string(p.Status.Phase) == phase {
 			if p.Spec.PersistentVolumeSource.RBD != nil {
-				boundPVImages = append(boundPVImages, p.Spec.PersistentVolumeSource.RBD.RBDImage)
+				matchingPVImages = append(matchingPVImages, p.Spec.PersistentVolumeSource.RBD.RBDImage)
 			}
 		}
 	}
-	logger.Infof("Found %d bound RBD persistent volumes in the cluster\n", len(boundPVImages))
-	metricBoundPVFound.Set(float64(len(boundPVImages)))
 
-	return boundPVImages, nil
+	return matchingPVImages, nil
 }

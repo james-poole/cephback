@@ -2,10 +2,12 @@ package cmd
 
 import (
 	"github.com/Sirupsen/logrus"
+	"github.com/fsnotify/fsnotify"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 	"io"
 	"os"
+	"strconv"
 	"time"
 )
 
@@ -13,26 +15,25 @@ var cfgFile string
 
 var cephUser string
 var debug bool
-var rbdSnapAgeMin int
-var rbdSnapAgeMax int
-var checkRbdInterval int
+var rbdSnapCountMin int
+var rbdSnapAgeMin time.Duration
+var rbdSnapAgeMax time.Duration
+var checkRbdInterval time.Duration
 var imageExclude []string
 var httpListen string
 var cephfsMount string
 var backupMount string
-var checkCephfsInterval int
-var rsyncCephfsInterval int
+var checkCephfsInterval time.Duration
+var rsyncCephfsInterval time.Duration
 var cephfsRsyncLock string
 var cephfsRsyncArgs []string
+var cephfsRsyncValidExitCodes []int
 var cephfsSuccessFile string
 var cephfsRbdName string
-var cephfsSnapAgeMin int
-var cephfsSnapAgeMax int
+var cephfsSnapCountMin int
+var cephfsSnapAgeMin time.Duration
+var cephfsSnapAgeMax time.Duration
 
-var rbdThresholdMin time.Duration
-var rbdThresholdMax time.Duration
-var cephfsThresholdMin time.Duration
-var cephfsThresholdMax time.Duration
 var logger = logrus.New()
 
 var RootCmd = &cobra.Command{
@@ -56,13 +57,6 @@ var RootCmd = &cobra.Command{
 	},
 	Run: func(cmd *cobra.Command, args []string) {
 
-		rbdThresholdMin = time.Duration(rbdSnapAgeMin) * time.Hour
-		rbdThresholdMax = time.Duration(rbdSnapAgeMax) * time.Hour
-		cephfsThresholdMin = time.Duration(cephfsSnapAgeMin) * time.Hour
-		cephfsThresholdMax = time.Duration(cephfsSnapAgeMax) * time.Hour
-		checkRbdIntervalMinutes := time.Duration(checkRbdInterval) * time.Minute
-		checkCephfsIntervalMinutes := time.Duration(checkCephfsInterval) * time.Minute
-
 		httpServe()
 
 		if err = CephConnInit(); err != nil {
@@ -74,7 +68,7 @@ var RootCmd = &cobra.Command{
 		imageExclude = append(imageExclude, cephfsRbdName)
 		// start the rbd routine
 		logger.Info("Starting RBD routine")
-		imageTicker := time.NewTicker(checkRbdIntervalMinutes)
+		imageTicker := time.NewTicker(checkRbdInterval)
 		go func() {
 			processImages()
 			for _ = range imageTicker.C {
@@ -82,13 +76,33 @@ var RootCmd = &cobra.Command{
 			}
 		}()
 
+		// start the failed pv routine - this is to handle Failed pv's - Openshift fails to delete the pv if the rbd has snapshots
+		logger.Info("Starting PVs Failed routine")
+		pvFailedTicker := time.NewTicker(time.Minute * 15)
+		go func() {
+			purgeSnapsOnFailedPV()
+			for _ = range pvFailedTicker.C {
+				purgeSnapsOnFailedPV()
+			}
+		}()
+
 		// start the cephfs routine
 		logger.Info("Starting CephFS routine")
-		cephfsTicker := time.NewTicker(checkCephfsIntervalMinutes)
+		cephfsTicker := time.NewTicker(checkCephfsInterval)
 		go func() {
 			processCephFS()
 			for _ = range cephfsTicker.C {
 				processCephFS()
+			}
+		}()
+
+		// start the health check routine
+		logger.Info("Starting health check routine")
+		healthTicker := time.NewTicker(time.Minute * 15)
+		go func() {
+			checkHealth()
+			for _ = range healthTicker.C {
+				checkHealth()
 			}
 		}()
 		// block forever
@@ -112,61 +126,67 @@ func init() {
 	RootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default is $HOME/cephback.yaml)")
 	RootCmd.PersistentFlags().StringP("ceph-user", "u", "admin", "Ceph user")
 	RootCmd.PersistentFlags().BoolP("debug", "d", false, "Enable debugging")
-	RootCmd.PersistentFlags().Int("rbd-snap-age-min", 24, "Duration in hours since the last snapshot before we take another one")
-	RootCmd.PersistentFlags().Int("rbd-snap-age-max", 168, "Snapshots older in hours than this will be deleted")
-	RootCmd.PersistentFlags().Int("rbd-interval", 60, "Interval in minutes between RBD snapshot checks")
+	RootCmd.PersistentFlags().Int("rbd-snap-count-min", 7, "The minimum number of RBD snapshots before we consider deleting older ones")
+	RootCmd.PersistentFlags().String("rbd-snap-age-min", "24h", "Duration since the last snapshot before we take another one")
+	RootCmd.PersistentFlags().String("rbd-snap-age-max", "168h", "Snapshots older than this will be deleted")
+	RootCmd.PersistentFlags().String("rbd-interval", "15m", "Interval between RBD snapshot checks")
 	RootCmd.PersistentFlags().StringSlice("exclude", []string{}, "Images to exclude from processing")
 	RootCmd.PersistentFlags().StringP("listen", "l", ":9090", "Port/IP to listen on")
 	RootCmd.PersistentFlags().String("cephfs-mount", "/cephfs", "Mountpoint for cephfs")
 	RootCmd.PersistentFlags().String("backup-mount", "/backup", "Mountpoint for backup destination")
-	RootCmd.PersistentFlags().Int("cephfs-interval", 60, "Interval in minutes between CephFS RBD snapshot checks")
-	RootCmd.PersistentFlags().Int("cephfs-rsync-interval", 24, "Interval in hours between CephFS rsyncs")
+	RootCmd.PersistentFlags().String("cephfs-interval", "15m", "Interval between CephFS RBD snapshot checks")
+	RootCmd.PersistentFlags().String("cephfs-rsync-interval", "24h", "Interval between CephFS rsyncs")
 	RootCmd.PersistentFlags().String("cephfs-rsync-lock", "/backup/rsync.lock", "Path to lock file for CephFS rsync")
 	RootCmd.PersistentFlags().StringSlice("cephfs-rsync-args", []string{"-ah", "--delete", "--delete-excluded"}, "Rsync args for the cephfs backup")
+	RootCmd.PersistentFlags().StringSlice("cephfs-rsync-valid-exit-codes", []string{"0", "24"}, "Rsync valid exit codes for the cephfs backup")
 	RootCmd.PersistentFlags().String("cephfs-success-file", "/backup/rsync_success", "Path to CephFS rsync success file")
 	RootCmd.PersistentFlags().String("cephfs-rbd-name", "cephfs_backup", "RBD name that CephFS is backed up to")
-	RootCmd.PersistentFlags().Int("cephfs-snap-age-min", 24, "Duration in hours since the last snapshot before we take another one")
-	RootCmd.PersistentFlags().Int("cephfs-snap-age-max", 168, "Snapshots older in hours than this will be deleted")
+	RootCmd.PersistentFlags().Int("cephfs-snap-count-min", 7, "The minimum number of CephFS RBD snapshots before we consider deleting older ones")
+	RootCmd.PersistentFlags().String("cephfs-snap-age-min", "24h", "Duration since the last snapshot before we take another one")
+	RootCmd.PersistentFlags().String("cephfs-snap-age-max", "168h", "Snapshots older than this will be deleted")
+}
 
-	//	Replaced with BindPFlags call in PreRun
-	//	viper.BindPFlag("user", RootCmd.PersistentFlags().Lookup("user"))
-	//	viper.BindPFlag("debug", RootCmd.PersistentFlags().Lookup("debug"))
-	//	viper.BindPFlag("rbd-snap-age-min", RootCmd.PersistentFlags().Lookup("rbd-snap-age-min"))
-	//	viper.BindPFlag("rbd-snap-age-max", RootCmd.PersistentFlags().Lookup("rbd-snap-age-max"))
-	//	viper.BindPFlag("rbd-interval", RootCmd.PersistentFlags().Lookup("rbd-interval"))
-	//	viper.BindPFlag("exclude", RootCmd.PersistentFlags().Lookup("exclude"))
-	//	viper.BindPFlag("listen", RootCmd.PersistentFlags().Lookup("listen"))
-	//	viper.BindPFlag("cephfs-mount", RootCmd.PersistentFlags().Lookup("cephfs-mount"))
-	//	viper.BindPFlag("backup-mount", RootCmd.PersistentFlags().Lookup("backup-mount"))
-	//	viper.BindPFlag("cephfs-interval", RootCmd.PersistentFlags().Lookup("cephfs-interval"))
-	//	viper.BindPFlag("cephfs-rsync-interval", RootCmd.PersistentFlags().Lookup("cephfs-rsync-interval"))
-	//	viper.BindPFlag("cephfs-rsync-lock", RootCmd.PersistentFlags().Lookup("cephfs-rsync-lock"))
-	//	viper.BindPFlag("cephfs-rsync-args", RootCmd.PersistentFlags().Lookup("cephfs-rsync-args"))
-	//	viper.BindPFlag("cephfs-success-file", RootCmd.PersistentFlags().Lookup("cephfs-success-file"))
-	//	viper.BindPFlag("cephfs-rbd-name", RootCmd.PersistentFlags().Lookup("cephfs-rbd-name"))
-	//	viper.BindPFlag("cephfs-snap-age-min", RootCmd.PersistentFlags().Lookup("cephfs-snap-age-min"))
-	//	viper.BindPFlag("cephfs-snap-age-max", RootCmd.PersistentFlags().Lookup("cephfs-snap-age-max"))
+func durationSettingParser(t string) time.Duration {
+	td, err := time.ParseDuration(viper.GetString(t))
+	if err != nil {
+		logger.Fatalf("Unable to parse '%s' setting: '%s'. %s", t, viper.GetString(t), err.Error())
+	}
+	return td
 }
 
 func setConfigVars() {
 
 	cephUser = viper.GetString("ceph-user")
 	debug = viper.GetBool("debug")
-	rbdSnapAgeMin = viper.GetInt("rbd-snap-age-min")
-	rbdSnapAgeMax = viper.GetInt("rbd-snap-age-max")
-	checkRbdInterval = viper.GetInt("rbd-interval")
+	rbdSnapCountMin = viper.GetInt("rbd-snap-count-min")
+	rbdSnapAgeMin = durationSettingParser("rbd-snap-age-min")
+	rbdSnapAgeMax = durationSettingParser("rbd-snap-age-max")
+	checkRbdInterval = durationSettingParser("rbd-interval")
+
 	imageExclude = viper.GetStringSlice("exclude")
 	httpListen = viper.GetString("listen")
 	cephfsMount = viper.GetString("cephfs-mount")
 	backupMount = viper.GetString("backup-mount")
-	checkCephfsInterval = viper.GetInt("cephfs-interval")
-	rsyncCephfsInterval = viper.GetInt("cephfs-rsync-interval")
+	checkCephfsInterval = durationSettingParser("cephfs-interval")
+	rsyncCephfsInterval = durationSettingParser("cephfs-rsync-interval")
 	cephfsRsyncLock = viper.GetString("cephfs-rsync-lock")
 	cephfsRsyncArgs = viper.GetStringSlice("cephfs-rsync-args")
+	// clear slice
+	cephfsRsyncValidExitCodes = cephfsRsyncValidExitCodes[:0]
+	ec := viper.GetStringSlice("cephfs-rsync-valid-exit-codes")
+	for a := range ec {
+		val, err := strconv.Atoi(ec[a])
+		if err == nil {
+			cephfsRsyncValidExitCodes = append(cephfsRsyncValidExitCodes, val)
+		} else {
+			logger.Errorf("Error processing cephfs-rsync-valid-exit-codes - unable to convert %s to int: %s", ec[a], err.Error())
+		}
+	}
 	cephfsSuccessFile = viper.GetString("cephfs-success-file")
 	cephfsRbdName = viper.GetString("cephfs-rbd-name")
-	cephfsSnapAgeMin = viper.GetInt("cephfs-snap-age-min")
-	cephfsSnapAgeMax = viper.GetInt("cephfs-snap-age-max")
+	cephfsSnapCountMin = viper.GetInt("cephfs-snap-count-min")
+	cephfsSnapAgeMin = durationSettingParser("cephfs-snap-age-min")
+	cephfsSnapAgeMax = durationSettingParser("cephfs-snap-age-max")
 
 }
 
@@ -185,4 +205,10 @@ func initConfig() {
 	if err := viper.ReadInConfig(); err == nil {
 		logger.Info("Using config file:", viper.ConfigFileUsed())
 	}
+
+	viper.WatchConfig()
+	viper.OnConfigChange(func(e fsnotify.Event) {
+		logger.Infof("Config file changed:", e.Name)
+		setConfigVars()
+	})
 }
