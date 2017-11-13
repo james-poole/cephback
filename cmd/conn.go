@@ -18,7 +18,7 @@ func CephConnInit() error {
 		}
 		logger.Info("Reading ceph config file")
 		if err = conn.ReadDefaultConfigFile(); err != nil {
-			return errors.New(fmt.Sprintf("Error reading default config file. %s", err))
+			return errors.New(fmt.Sprintf("Error reading default ceph config file. %s", err))
 		}
 		logger.Info("Connecting to ceph cluster")
 		if err = conn.Connect(); err != nil {
