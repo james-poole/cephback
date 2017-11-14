@@ -1,28 +1,32 @@
 
-[[dependencies]]
+[[constraint]]
   branch = "master"
   name = "github.com/Sirupsen/logrus"
 
-[[dependencies]]
+[[constraint]]
   branch = "master"
   name = "github.com/alexflint/go-filemutex"
 
-[[dependencies]]
+[[constraint]]
   branch = "master"
   name = "github.com/ceph/go-ceph"
 
-[[dependencies]]
+[[constraint]]
   branch = "master"
   name = "github.com/prometheus/client_golang"
 
-[[dependencies]]
+[[constraint]]
   branch = "master"
   name = "github.com/spf13/cobra"
 
-[[dependencies]]
+[[constraint]]
   branch = "master"
   name = "github.com/spf13/viper"
 
-[[dependencies]]
+[[constraint]]
   name = "k8s.io/client-go"
   version = "v2.0.0"
+
+[[override]]
+  name = "github.com/ugorji/go"
+  revision = "8c0409fcbb70099c748d71f714529204975f6c3f"
