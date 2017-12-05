@@ -8,12 +8,12 @@ if [ "$?" != "0" ]; then
   echo "Extract of binary from build image failed"
   exit 1
 fi
-docker build -t jameseckersall/cephback:latest .
+docker build -t docker.io/fhjamespoole/cephback .
 if [ "$?" != "0" ]; then
   echo "Build of final image failed"
   exit 1
 fi
-docker push jameseckersall/cephback:latest
+docker push docker.io/fhjamespoole/cephback
 if [ "$?" != "0" ]; then
   echo "Push failed"
   exit 1

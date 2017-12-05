@@ -20,6 +20,7 @@ var rbdSnapAgeMin time.Duration
 var rbdSnapAgeMax time.Duration
 var checkRbdInterval time.Duration
 var checkPurgedInterval time.Duration
+var healthCheckInterval time.Duration
 var imageExclude []string
 var httpListen string
 var cephfsMount string
@@ -68,7 +69,7 @@ var RootCmd = &cobra.Command{
 		// remove the cephfs rbd from the list - we'll handle this separately
 		imageExclude = append(imageExclude, cephfsRbdName)
 		// start the rbd routine
-		logger.Info("Starting RBD routine")
+		logger.Infof("Starting RBD routine every %s", checkRbdInterval)
 		imageTicker := time.NewTicker(checkRbdInterval)
 		go func() {
 			processImages()
@@ -78,7 +79,7 @@ var RootCmd = &cobra.Command{
 		}()
 
 		// start the failed pv routine - this is to handle Failed pv's - Openshift fails to delete the pv if the rbd has snapshots
-		logger.Info("Starting PVs Failed routine")
+		logger.Infof("Starting PVs Failed routine every %s", checkPurgedInterval)
 		pvFailedTicker := time.NewTicker(checkPurgedInterval)
 		go func() {
 			purgeSnapsOnFailedPV()
@@ -88,7 +89,7 @@ var RootCmd = &cobra.Command{
 		}()
 
 		// start the cephfs routine
-		logger.Info("Starting CephFS routine")
+		logger.Infof("Starting CephFS routine every %s", checkCephfsInterval)
 		cephfsTicker := time.NewTicker(checkCephfsInterval)
 		go func() {
 			processCephFS()
@@ -98,8 +99,8 @@ var RootCmd = &cobra.Command{
 		}()
 
 		// start the health check routine
-		logger.Info("Starting health check routine")
-		healthTicker := time.NewTicker(time.Minute * 15)
+		logger.Infof("Starting health check routine every %s", healthCheckInterval)
+		healthTicker := time.NewTicker(healthCheckInterval)
 		go func() {
 			checkHealth()
 			for _ = range healthTicker.C {
@@ -132,6 +133,7 @@ func init() {
 	RootCmd.PersistentFlags().String("rbd-snap-age-max", "168h", "Snapshots older than this will be deleted")
 	RootCmd.PersistentFlags().String("rbd-interval", "15m", "Interval between RBD snapshot checks")
 	RootCmd.PersistentFlags().String("purge-interval", "15m", "Interval between checks for snapshots to purge")
+	RootCmd.PersistentFlags().String("healthcheck-interval", "15m", "Interval between snapshot healthchecks")
 	RootCmd.PersistentFlags().StringSlice("exclude", []string{}, "Images to exclude from processing")
 	RootCmd.PersistentFlags().StringP("listen", "l", ":9090", "Port/IP to listen on")
 	RootCmd.PersistentFlags().String("cephfs-mount", "/cephfs", "Mountpoint for cephfs")
@@ -165,7 +167,7 @@ func setConfigVars() {
 	rbdSnapAgeMax = durationSettingParser("rbd-snap-age-max")
 	checkRbdInterval = durationSettingParser("rbd-interval")
 	checkPurgedInterval = durationSettingParser("purge-interval")
-
+	healthCheckInterval = durationSettingParser("healthcheck-interval")
 	imageExclude = viper.GetStringSlice("exclude")
 	httpListen = viper.GetString("listen")
 	cephfsMount = viper.GetString("cephfs-mount")
