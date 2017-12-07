@@ -3,6 +3,7 @@ package cmd
 import (
 	"github.com/Sirupsen/logrus"
 	"github.com/fsnotify/fsnotify"
+	"github.com/robfig/cron"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 	"io"
@@ -18,14 +19,14 @@ var debug bool
 var rbdSnapCountMin int
 var rbdSnapAgeMin time.Duration
 var rbdSnapAgeMax time.Duration
-var checkRbdInterval time.Duration
-var checkPurgedInterval time.Duration
-var healthCheckInterval time.Duration
+var checkRbdInterval string
+var checkPurgedInterval string
+var healthCheckInterval string
 var imageExclude []string
 var httpListen string
 var cephfsMount string
 var backupMount string
-var checkCephfsInterval time.Duration
+var checkCephfsInterval string
 var rsyncCephfsInterval time.Duration
 var cephfsRsyncLock string
 var cephfsRsyncArgs []string
@@ -68,44 +69,22 @@ var RootCmd = &cobra.Command{
 
 		// remove the cephfs rbd from the list - we'll handle this separately
 		imageExclude = append(imageExclude, cephfsRbdName)
-		// start the rbd routine
-		logger.Infof("Starting RBD routine every %s", checkRbdInterval)
-		imageTicker := time.NewTicker(checkRbdInterval)
-		go func() {
-			processImages()
-			for _ = range imageTicker.C {
-				processImages()
-			}
-		}()
-
-		// start the failed pv routine - this is to handle Failed pv's - Openshift fails to delete the pv if the rbd has snapshots
-		logger.Infof("Starting PVs Failed routine every %s", checkPurgedInterval)
-		pvFailedTicker := time.NewTicker(checkPurgedInterval)
-		go func() {
-			purgeSnapsOnFailedPV()
-			for _ = range pvFailedTicker.C {
-				purgeSnapsOnFailedPV()
-			}
-		}()
-
-		// start the cephfs routine
-		logger.Infof("Starting CephFS routine every %s", checkCephfsInterval)
-		cephfsTicker := time.NewTicker(checkCephfsInterval)
-		go func() {
-			processCephFS()
-			for _ = range cephfsTicker.C {
-				processCephFS()
-			}
-		}()
-
-		// start the health check routine
+		logger.Infof("Starting RBD routine on cron schedule -> %s", checkRbdInterval)
+		logger.Infof("Starting PVs Failed routine on cron schedule -> %s", checkPurgedInterval)
+		logger.Infof("Starting CephFS routine every on cron schedule -> %s", checkCephfsInterval)
 		logger.Infof("Starting health check routine every %s", healthCheckInterval)
-		healthTicker := time.NewTicker(healthCheckInterval)
 		go func() {
-			checkHealth()
-			for _ = range healthTicker.C {
-				checkHealth()
-			}
+			// initialize a new cron
+			c := cron.New()
+			// add the rbd routine
+			c.AddFunc(checkRbdInterval, processImages)
+			// add the failed pv routine - this is to handle Failed pv's - Openshift fails to delete the pv if the rbd has snapshots
+			c.AddFunc(checkPurgedInterval, purgeSnapsOnFailedPV)
+			// add the cephfs routine
+			c.AddFunc(checkCephfsInterval, processCephFS)
+			// add the health check routine
+			c.AddFunc(healthCheckInterval, checkHealth)
+			go c.Start()
 		}()
 		// block forever
 		select {}
@@ -131,14 +110,14 @@ func init() {
 	RootCmd.PersistentFlags().Int("rbd-snap-count-min", 7, "The minimum number of RBD snapshots before we consider deleting older ones")
 	RootCmd.PersistentFlags().String("rbd-snap-age-min", "24h", "Duration since the last snapshot before we take another one")
 	RootCmd.PersistentFlags().String("rbd-snap-age-max", "168h", "Snapshots older than this will be deleted")
-	RootCmd.PersistentFlags().String("rbd-interval", "15m", "Interval between RBD snapshot checks")
-	RootCmd.PersistentFlags().String("purge-interval", "15m", "Interval between checks for snapshots to purge")
-	RootCmd.PersistentFlags().String("healthcheck-interval", "15m", "Interval between snapshot healthchecks")
+	RootCmd.PersistentFlags().String("rbd-interval", "* */15 * * * *", "Interval between RBD snapshot checks")
+	RootCmd.PersistentFlags().String("purge-interval", "* */15 * * * *", "Interval between checks for snapshots to purge")
+	RootCmd.PersistentFlags().String("healthcheck-interval", "* */15 * * * *", "Interval between snapshot healthchecks")
 	RootCmd.PersistentFlags().StringSlice("exclude", []string{}, "Images to exclude from processing")
 	RootCmd.PersistentFlags().StringP("listen", "l", ":9090", "Port/IP to listen on")
 	RootCmd.PersistentFlags().String("cephfs-mount", "/cephfs", "Mountpoint for cephfs")
 	RootCmd.PersistentFlags().String("backup-mount", "/backup", "Mountpoint for backup destination")
-	RootCmd.PersistentFlags().String("cephfs-interval", "15m", "Interval between CephFS RBD snapshot checks")
+	RootCmd.PersistentFlags().String("cephfs-interval", "* */15 * * * *", "Interval between CephFS RBD snapshot checks")
 	RootCmd.PersistentFlags().String("cephfs-rsync-interval", "24h", "Interval between CephFS rsyncs")
 	RootCmd.PersistentFlags().String("cephfs-rsync-lock", "/backup/rsync.lock", "Path to lock file for CephFS rsync")
 	RootCmd.PersistentFlags().StringSlice("cephfs-rsync-args", []string{"-ah", "--delete", "--delete-excluded"}, "Rsync args for the cephfs backup")
@@ -158,6 +137,15 @@ func durationSettingParser(t string) time.Duration {
 	return td
 }
 
+func cronSettingParser(t string) string {
+	_, err := cron.Parse(viper.GetString(t))
+	if err != nil {
+		logger.Fatalf("Unable to parse '%s' setting: '%s'. %s", t, viper.GetString(t), err.Error())
+		os.Exit(2)
+	}
+	return t
+}
+
 func setConfigVars() {
 
 	cephUser = viper.GetString("ceph-user")
@@ -165,14 +153,14 @@ func setConfigVars() {
 	rbdSnapCountMin = viper.GetInt("rbd-snap-count-min")
 	rbdSnapAgeMin = durationSettingParser("rbd-snap-age-min")
 	rbdSnapAgeMax = durationSettingParser("rbd-snap-age-max")
-	checkRbdInterval = durationSettingParser("rbd-interval")
-	checkPurgedInterval = durationSettingParser("purge-interval")
-	healthCheckInterval = durationSettingParser("healthcheck-interval")
+	checkRbdInterval = cronSettingParser("rbd-interval")
+	checkPurgedInterval = cronSettingParser("purge-interval")
+	healthCheckInterval = cronSettingParser("healthcheck-interval")
 	imageExclude = viper.GetStringSlice("exclude")
 	httpListen = viper.GetString("listen")
 	cephfsMount = viper.GetString("cephfs-mount")
 	backupMount = viper.GetString("backup-mount")
-	checkCephfsInterval = durationSettingParser("cephfs-interval")
+	checkCephfsInterval = cronSettingParser("cephfs-interval")
 	rsyncCephfsInterval = durationSettingParser("cephfs-rsync-interval")
 	cephfsRsyncLock = viper.GetString("cephfs-rsync-lock")
 	cephfsRsyncArgs = viper.GetStringSlice("cephfs-rsync-args")
