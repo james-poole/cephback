@@ -72,18 +72,18 @@ var RootCmd = &cobra.Command{
 		logger.Infof("Starting RBD routine on cron schedule -> %s", checkRbdInterval)
 		logger.Infof("Starting PVs Failed routine on cron schedule -> %s", checkPurgedInterval)
 		logger.Infof("Starting CephFS routine every on cron schedule -> %s", checkCephfsInterval)
-		logger.Infof("Starting health check routine every %s", healthCheckInterval)
+		logger.Infof("Starting health check routine on cron schedule -> %s", healthCheckInterval)
 		go func() {
 			// initialize a new cron
 			c := cron.New()
 			// add the rbd routine
-			c.AddFunc(checkRbdInterval, processImages)
+			c.AddFunc(checkRbdInterval, func() { processImages() })
 			// add the failed pv routine - this is to handle Failed pv's - Openshift fails to delete the pv if the rbd has snapshots
-			c.AddFunc(checkPurgedInterval, purgeSnapsOnFailedPV)
+			c.AddFunc(checkPurgedInterval, func() { purgeSnapsOnFailedPV() })
 			// add the cephfs routine
-			c.AddFunc(checkCephfsInterval, processCephFS)
+			c.AddFunc(checkCephfsInterval, func() { processCephFS() })
 			// add the health check routine
-			c.AddFunc(healthCheckInterval, checkHealth)
+			c.AddFunc(healthCheckInterval, func() { checkHealth() })
 			go c.Start()
 		}()
 		// block forever
@@ -143,7 +143,7 @@ func cronSettingParser(t string) string {
 		logger.Fatalf("Unable to parse '%s' setting: '%s'. %s", t, viper.GetString(t), err.Error())
 		os.Exit(2)
 	}
-	return t
+	return viper.GetString(t)
 }
 
 func setConfigVars() {
