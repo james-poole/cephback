@@ -71,7 +71,7 @@ var RootCmd = &cobra.Command{
 		imageExclude = append(imageExclude, cephfsRbdName)
 		logger.Infof("Starting RBD routine on cron schedule -> %s", checkRbdInterval)
 		logger.Infof("Starting PVs Failed routine on cron schedule -> %s", checkPurgedInterval)
-		logger.Infof("Starting CephFS routine every on cron schedule -> %s", checkCephfsInterval)
+		logger.Infof("Starting CephFS routine on cron schedule -> %s", checkCephfsInterval)
 		logger.Infof("Starting health check routine on cron schedule -> %s", healthCheckInterval)
 		go func() {
 			// initialize a new cron
