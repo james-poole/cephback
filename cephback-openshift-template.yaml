@@ -52,7 +52,7 @@ objects:
         tags: cephback
       from:
         kind: DockerImage
-        name: jameseckersall/cephback:latest
+        name: fhjamespoole/cephback:latest
 
 - apiVersion: v1
   kind: DeploymentConfig
